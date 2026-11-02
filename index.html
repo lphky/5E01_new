@@ -152,7 +152,7 @@
             </div>
 
             <!-- Notification Toast -->
-            <div id="toast" class="absolute top-10 left-1/2 -translate-x-1/2 bg-black/85 backdrop-blur-md border border-cyan-500/60 text-cyan-300 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-2 z-10 whitespace-nowrap">
+            <div id="toast" style="z-index: 30" class="absolute top-10 left-1/2 -translate-x-1/2 bg-black/85 backdrop-blur-md border border-cyan-500/60 text-cyan-300 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-2 z-10 whitespace-nowrap">
                 POWER UP!
             </div>
 
@@ -165,7 +165,7 @@
                         </div>
                     </div>
                     <h1 class="text-3xl font-black italic tracking-wider neon-text-pink mb-0.5">RETRO RACER</h1>
-                    <p class="text-xs text-cyan-400 tracking-widest font-bold mb-3">F1 ULTRA GRAND PRIX 終極大獎賽</p>
+                    <p class="text-xs text-cyan-400 tracking-widest font-bold mb-3">F1 ULTRA GRAND PRIX <button id="secret-coins-trigger" type="button" class="select-none touch-manipulation" style="font: inherit; letter-spacing: inherit; color: inherit;">終極</button>大獎賽</p>
 
                     <!-- Nav Tabs -->
                     <div class="flex gap-1.5 mb-3 bg-gray-900/90 p-1 rounded-xl border border-gray-800 text-[11px]">
@@ -1059,6 +1059,22 @@
             totalCoinsDom.innerText = `$${totalCoins}`;
             updateUpgradesUI();
         }
+
+        let secretCoinClicks = 0;
+        let lastSecretCoinClick = 0;
+        document.getElementById("secret-coins-trigger").addEventListener("click", () => {
+            const now = performance.now();
+            secretCoinClicks = now - lastSecretCoinClick <= 1500 ? secretCoinClicks + 1 : 1;
+            lastSecretCoinClick = now;
+            if (secretCoinClicks < 5) return;
+            secretCoinClicks = 0;
+            totalCoins += 1000;
+            localStorage.setItem("retro_racer_coins", totalCoins);
+            totalCoinsDom.innerText = `$${totalCoins}`;
+            updateGarageUI();
+            unlockAchievement("coin_collector");
+            showToast("隱藏秘技！金幣 +$1000");
+        });
 
         // Achievements Logic
         function unlockAchievement(id) {
