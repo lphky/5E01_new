@@ -193,7 +193,7 @@
                     <div class="bg-gray-900/90 border border-gray-800 rounded-xl p-2.5 text-left space-y-1 text-[11px] text-gray-300">
                         <div class="flex items-center space-x-2">
                             <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                            <span><b>動態難度系統</b>：分數越高敵車生成越密，並會嘗試換道阻擋！</span>
+                            <span><b>動態難度系統</b>：首 30 秒輕鬆起步，之後逐步加速、增加敵車；後段才會換道阻擋。</span>
                         </div>
                         <div class="flex items-center space-x-2">
                             <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -673,6 +673,8 @@
         let currentSpeedKmh = 220;
         let maxSpeedReachedThisRun = 220;
         let difficultyLevel = 1;
+        let drivingTime = 0;
+        let lastDrivingFrame = null;
         
         let hasShield = false;
         let spinoutTimer = 0;
@@ -725,7 +727,7 @@
         ];
 
         let spawnTimer = 0;
-        let spawnInterval = 60;
+        let spawnInterval = 90;
 
         // Display saved high score on start
         highScoreDom.innerText = highScore;
@@ -1106,15 +1108,17 @@
             const engineBoost = (upgrades.engine - 1) * 12;
             score = 0;
             earnedCoinsCurrentRun = 0;
-            baseSpeed = (currentCar.speed + engineBoost) / 15;
-            currentSpeedKmh = currentCar.speed + engineBoost;
+            currentSpeedKmh = (currentCar.speed + engineBoost) * 0.75;
+            baseSpeed = currentSpeedKmh / 15;
             maxSpeedReachedThisRun = currentSpeedKmh;
             difficultyLevel = 1;
+            drivingTime = 0;
+            lastDrivingFrame = null;
 
             hasShield = false;
             spinoutTimer = 0;
             nitroEnergy = MAX_NITRO;
-            spawnInterval = 60;
+            spawnInterval = 90;
             spawnTimer = 0;
             isBraking = false;
             tireTemp = 20;
@@ -1393,11 +1397,11 @@
             
             // Speed increases with difficulty
             const extraSpeed = Math.min(6, (difficultyLevel - 1) * 0.8);
-            const canChangeLane = difficultyLevel >= 2 && Math.random() < 0.45;
+            const canChangeLane = difficultyLevel >= 3 && Math.random() < Math.min(0.45, (difficultyLevel - 2) * 0.1);
 
             // 敵車行為模式: 1.巡航 (CRUISE) 2.飆車加速 (FAST) 3.隨機煞車減速 (BRAKE)
             const behaviors = ["CRUISE", "FAST", "BRAKE"];
-            const behavior = behaviors[Math.floor(Math.random() * behaviors.length)];
+            const behavior = difficultyLevel < 2 ? "CRUISE" : behaviors[Math.floor(Math.random() * behaviors.length)];
             let baseEnemySpeed = Math.random() * 2 + 3.5 + extraSpeed;
             if (behavior === "FAST") baseEnemySpeed += 2.5;
             if (behavior === "BRAKE") baseEnemySpeed -= 1.5;
@@ -1519,7 +1523,13 @@
         }
 
         // Main Loop
-        function gameLoop() {
+        function gameLoop(timestamp = performance.now()) {
+            if (gameState === "PLAYING") {
+                if (lastDrivingFrame !== null) drivingTime += Math.min(100, timestamp - lastDrivingFrame) / 1000;
+                lastDrivingFrame = timestamp;
+            } else {
+                lastDrivingFrame = null;
+            }
             ctx.save();
             if (shakeTime > 0) {
                 ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
@@ -1532,13 +1542,16 @@
                 const currentCar = CARS[selectedCarIndex];
 
                 // Dynamic Difficulty Calculation
-                difficultyLevel = 1 + Math.floor(score / 300);
-                spawnInterval = Math.max(22, 60 - (difficultyLevel - 1) * 7);
+                const progression = Math.min(5, Math.max(0, (drivingTime - 30) / 30));
+                difficultyLevel = 1 + Math.floor(progression);
+                spawnInterval = Math.max(45, 90 - progression * 9);
+                currentSpeedKmh = (currentCar.speed + (upgrades.engine - 1) * 12) * (0.75 + progression * 0.05);
+                baseSpeed = currentSpeedKmh / 15;
                 difficultyBadge.innerText = `難度: ${difficultyLevel}`;
 
                 // DRS Periodical Mechanic
                 drsTimer++;
-                if (drsTimer > 350 && !drsZoneActive) {
+                if (drivingTime >= 60 && drsTimer > 1800 && !drsZoneActive) {
                     drsZoneActive = true;
                     drsIndicator.classList.remove("hidden");
                     sound.playDRSSound();
